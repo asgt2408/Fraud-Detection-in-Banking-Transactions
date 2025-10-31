@@ -93,68 +93,99 @@ void analysedates(){
         }
     }
 }
-
-long long datetoint(const string & date){
-    string s = date;
-    s.erase(remove(s.begin(),s.end(),'-'),s.end());
-    return stoll(s);
+    time_t datetotime(const string &date) {
+    struct tm tm{};
+    sscanf(date.c_str(), "%d-%d-%d", &tm.tm_year, &tm.tm_mon, &tm.tm_mday);
+    tm.tm_year -= 1900; 
+    tm.tm_mon -= 1;     
+    tm.tm_hour = 0;
+    tm.tm_min = 0;
+    tm.tm_sec = 0;
+    return mktime(&tm);
 }
 
-void analyseperiod(){
-    string start_date;
-    cout<<"Enter the start date(yyyy-mm-dd): ";
-    cin>>start_date;
+//  Period-wise analysis (real date range)
+void analyseperiod() {
+    string start_date, end_date;
+    cout << "\nEnter the start date (yyyy-mm-dd): ";
+    cin >> start_date;
+    cout << "Enter the end date (yyyy-mm-dd): ";
+    cin >> end_date;
 
-    string end_date;
-    cout<<"Enter the end date(yyyy-mm-dd): ";
-    cin>>end_date;
+    time_t start = datetotime(start_date);
+    time_t end = datetotime(end_date);
 
-    long long start = datetoint(start_date);
-    long long end = datetoint(end_date);
+    // Calculate actual difference in days
+    double days_diff = difftime(end, start) / (60 * 60 * 24) + 1;
+    cout << "\nDate range covers approximately " << days_diff << " days.\n";
 
-    for(auto &pair : accounts){
+    if (days_diff <= 7)
+        cout << " Duration Type: Weekly Analysis\n";
+    else if (days_diff > 7 && days_diff <= 30)
+        cout << "Duration Type: Monthly Analysis\n";
+    else
+        cout << " Duration Type: Long-term Analysis\n";
+
+    for (auto &pair : accounts) {
         string acc = pair.first;
-        vector<Transaction> & txn = pair.second;
+        vector<Transaction> &txn = pair.second;
 
         unordered_map<string, long long> periodtotal;
         long long grandtotal = 0;
 
-        for(auto & one : txn){
-            long long datetime = datetoint(one.date);
-            if(datetime>=start && datetime<=end){
-                long long amount = stoi(one.amount);
+        for (auto &one : txn) {
+            time_t datetime = datetotime(one.date);
+            if (datetime >= start && datetime <= end) {
+                long long amount = stoll(one.amount);
                 periodtotal[one.date] += amount;
                 grandtotal += amount;
             }
         }
+
         if (grandtotal == 0) {
-            cout << "\nAccount: " << acc 
-                 << " -> No transactions found in this range.\n";
+            cout << "\nAccount: " << acc
+                 << " → No transactions found in this range.\n";
             continue;
         }
-        cout << "\nAccount: " << acc 
-                 << "\nDate Range: " << start_date << " -> " << end_date 
-                 << "\nTotal Amount: " << grandtotal << endl;
 
-            // Classification logic (same as daily)
-            if (grandtotal < 50000)
-                cout << "Status: Normal Transaction\n";
-            else if (grandtotal >= 50000 && grandtotal < 200000)
-                cout << "Status: Alert \n";
-            else
-                cout << "Status: Suspicious \n";
-            
-        
-    }
-    }
+        cout << "\nAccount: " << acc
+             << "\nDate Range: " << start_date << " → " << end_date
+             << "\nTotal Amount: " << grandtotal << endl;
 
+        // Classification logic
+        if(days_diff<=7){
+        if (grandtotal < 50000)
+            cout << "Status: Normal Transaction\n";
+        else if (grandtotal >= 50000 && grandtotal < 200000)
+            cout << "Status: Alert \n";
+        else
+            cout << "Status: Suspicious \n";
+        }
 
-
+        else if(days_diff>=7 && days_diff<=30){
+            if (grandtotal < 1000000)
+            cout << "Status: Normal Transaction\n";
+        else if (grandtotal >= 1000000 && grandtotal <= 2000000)
+            cout << "Status: Alert \n";
+        else
+            cout << "Status: Suspicious \n";
+        }
+        else{
+            if (grandtotal < 3000000)
+            cout << "Status: Normal Transaction\n";
+        else if (grandtotal >= 3000000 && grandtotal <= 5000000)
+            cout << "Status: Alert \n";
+        else
+            cout << "Status: Suspicious \n";
+        }
+}
+}
 
 int main(){
     loadaccounts();
     displayaccounts();
-    analysedates();
+    //analysedates();
     analyseperiod();
 }
+
 
