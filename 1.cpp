@@ -119,7 +119,11 @@ void analyseperiod() {
     double days_diff = difftime(end, start) / (60 * 60 * 24) + 1;
     cout << "\nDate range covers approximately " << days_diff << " days.\n";
 
-    if (days_diff <= 7)
+    if(days_diff==1){
+        cout<<"For: " <<start_date<<" Analysis\n";
+    }
+
+    else if (days_diff>1 && days_diff <= 7)
         cout << " Duration Type: Weekly Analysis\n";
     else if (days_diff > 7 && days_diff <= 30)
         cout << "Duration Type: Monthly Analysis\n";
@@ -152,7 +156,7 @@ void analyseperiod() {
              << "\nDate Range: " << start_date << " → " << end_date
              << "\nTotal Amount: " << grandtotal << endl;
 
-        // Classification logic
+        
         if(days_diff<=7){
         if (grandtotal < 50000)
             cout << "Status: Normal Transaction\n";
@@ -181,11 +185,98 @@ void analyseperiod() {
 }
 }
 
+// Convert "hh:mm" → integer like 930 for 09:30
+int timeToInt(const string &t) {
+    int h = 0, m = 0;
+    sscanf(t.c_str(), "%d:%d", &h, &m);
+    return h * 100 + m;
+}
+
+// Get absolute difference in minutes between two times (same day)
+int timeDiffMinutes(const string &t1, const string &t2) {
+    int h1, m1, h2, m2;
+    sscanf(t1.c_str(), "%d:%d", &h1, &m1);
+    sscanf(t2.c_str(), "%d:%d", &h2, &m2);
+    return abs((h2 * 60 + m2) - (h1 * 60 + m1));
+}
+
+void analysetime() {
+    cout << "\n\n Time-Based Fraud Detection Report\n"
+         << "----------------------------------------\n";
+
+    string target_date;
+    cout << "Enter the date to analyze (yyyy-mm-dd): ";
+    cin >> target_date;
+
+    for (auto &it : accounts) {
+        string acc = it.first;
+        vector<Transaction> &tx = it.second;
+
+        // Filter transactions for selected date
+        vector<Transaction> dayTx;
+        for (auto &t : tx) {
+            if (t.date == target_date)
+                dayTx.push_back(t);
+        }
+
+        if (dayTx.empty())
+            continue;
+
+        sort(dayTx.begin(), dayTx.end(), [](const Transaction &a, const Transaction &b) {
+            return a.time < b.time;
+        });
+
+        bool flagged = false;
+
+        cout << "\nAccount: " << acc << " | Date: " << target_date << "\n";
+
+        for (int i = 0; i < (int)dayTx.size(); i++) {
+            int count10 = 1;
+
+            for (int j = i + 1; j < (int)dayTx.size(); j++) {
+                int diff = timeDiffMinutes(dayTx[i].time, dayTx[j].time);
+                if (diff <= 10)
+                    count10++;
+                else
+                    break;
+            }
+
+            // --- 10-min window analysis ---
+            if (count10 > 5) {
+                cout << "Suspicious Activity (10-min window): "
+                     << count10 << " transactions within 10 minutes (starting at "
+                     << dayTx[i].time << ")\n"
+                     << " Reason: More than 5 rapid transactions is abnormal.\n"
+                     << " -> Possible automation or system misuse.\n";
+                flagged = true;
+                break;
+            } 
+            else if (count10 >= 2 && count10 <= 5) {
+                cout << "Alert (10-min window): "
+                     << count10 << " transactions within 10 minutes (starting at "
+                     << dayTx[i].time << ")\n"
+                     << "Explanation: Quick repeated transactions -- may indicate card testing or fraud probes.\n";
+                flagged = true;
+                break;
+            }
+        }
+
+        // ✅ If no suspicious or alert activity found
+        if (!flagged) {
+            cout << "Status: Normal -> " << dayTx.size()
+                 << " transactions recorded for this date.\n"
+                 << "Explanation: Transaction frequency within acceptable range.\n";
+        }
+    }
+}
+
+
 int main(){
     loadaccounts();
     displayaccounts();
     //analysedates();
-    analyseperiod();
+    //analyseperiod();
+    analysetime();
 }
 
 

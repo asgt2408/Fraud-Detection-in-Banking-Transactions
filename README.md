@@ -32,12 +32,3 @@ c. Time wise breakup
     1. 5+ transactions in under 10 min, suspicious
     2. between 2 and 5, alert
     3. else normal
-
-    1. 15+ transactions in under 30 min, suspicious
-    2. between 10 and 15, alert
-    3. else normal
-
-    1. 30+ transactions in 1 hr, suspicious
-    2. between 20 and 30, alert
-    3. else normal
-
