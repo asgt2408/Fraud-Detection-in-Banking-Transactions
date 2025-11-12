@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "*.ejs": "html",
+        "iostream": "cpp"
+    },
+    "files.encoding": "utf8",
+    "terminal.integrated.env.windows": {
+        "chcp": "65001"
+    },
+    "terminal.integrated.fontFamily": "Cascadia Code, Consolas, 'Courier New', monospace"
+}
