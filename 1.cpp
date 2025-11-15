@@ -221,110 +221,140 @@ pair<int,int> analyseperiod(const vector<Transaction>& tx, double days_diff) {
 }
 
 
+// int analysetime(const vector<Transaction>& tx) {
+
+//      int finalresult = 0; // 0: normal, 1: alert, 2: suspicious
+
+//         vector<Transaction> dayTx;
+//         for (auto &t : tx) {
+//                 dayTx.push_back(t);
+//         }
+
+
+//         sort(dayTx.begin(), dayTx.end(), [](const Transaction &a, const Transaction &b) {
+//             return a.time < b.time;
+//         });
+
+//         bool flagged = false;
+
+//         //cout << "\nAccount: " << acc << " | Date: " << target_date << "\n";
+
+//         for (int i = 0; i < (int)dayTx.size(); i++) {
+//             int count10 = 1;
+
+//             for (int j = i + 1; j < (int)dayTx.size(); j++) {
+//                 int diff = timeDiffMinutes(dayTx[i].time, dayTx[j].time);
+//                 if (diff <= 10)
+//                     count10++;
+//                 else
+//                     break;
+//             }
+
+//             // --- 10-min window analysis ---
+//             if (count10 > 5) {
+//                 // cout << "Suspicious Activity (10-min window): "
+//                 //      << count10 << " transactions within 10 minutes (starting at "
+//                 //      << dayTx[i].time << ")\n"
+//                 //      << " Reason: More than 5 rapid transactions is abnormal.\n"
+//                 //      << " -> Possible automation or system misuse.\n";
+//                 flagged = true;
+//                 finalresult = max(finalresult,2);
+//                 break;
+//             } 
+//             else if (count10 >= 2 && count10 <= 5) {
+//                 // cout << "Alert (10-min window): "
+//                 //      << count10 << " transactions within 10 minutes (starting at "
+//                 //      << dayTx[i].time << ")\n"
+//                 //      << "Explanation: Quick repeated transactions -- may indicate card testing or fraud probes.\n";
+//                 flagged = true;
+//                 finalresult = max(finalresult,1);
+//                 break;
+//             }
+        
+//     }
+//     return finalresult;
+// }
+
 int analysetime(const vector<Transaction>& tx) {
 
-     int finalresult = 0; // 0: normal, 1: alert, 2: suspicious
+    int finalresult = 0; // 0: normal, 1: alert, 2: suspicious
 
-        vector<Transaction> dayTx;
-        for (auto &t : tx) {
-                dayTx.push_back(t);
-        }
+    // Group transactions by date
+    unordered_map<string, vector<Transaction>> perDate;
+    for (const auto &t : tx) perDate[t.date].push_back(t);
 
+    for (auto &day : perDate) {
+        vector<Transaction> dayTx = day.second;
 
+        // sort by time for that day
         sort(dayTx.begin(), dayTx.end(), [](const Transaction &a, const Transaction &b) {
             return a.time < b.time;
         });
-
-        bool flagged = false;
-
-        //cout << "\nAccount: " << acc << " | Date: " << target_date << "\n";
 
         for (int i = 0; i < (int)dayTx.size(); i++) {
             int count10 = 1;
-
             for (int j = i + 1; j < (int)dayTx.size(); j++) {
                 int diff = timeDiffMinutes(dayTx[i].time, dayTx[j].time);
-                if (diff <= 10)
-                    count10++;
-                else
-                    break;
+                if (diff <= 10) count10++;
+                else break;
             }
 
-            // --- 10-min window analysis ---
             if (count10 > 5) {
-                // cout << "Suspicious Activity (10-min window): "
-                //      << count10 << " transactions within 10 minutes (starting at "
-                //      << dayTx[i].time << ")\n"
-                //      << " Reason: More than 5 rapid transactions is abnormal.\n"
-                //      << " -> Possible automation or system misuse.\n";
-                flagged = true;
-                finalresult = max(finalresult,2);
-                break;
-            } 
-            else if (count10 >= 2 && count10 <= 5) {
-                // cout << "Alert (10-min window): "
-                //      << count10 << " transactions within 10 minutes (starting at "
-                //      << dayTx[i].time << ")\n"
-                //      << "Explanation: Quick repeated transactions -- may indicate card testing or fraud probes.\n";
-                flagged = true;
-                finalresult = max(finalresult,1);
-                break;
+                finalresult = max(finalresult, 2);
+                break; // this date is already suspicious, go to next date
+            } else if (count10 >= 2 && count10 <= 5) {
+                finalresult = max(finalresult, 1);
+                // don't break here — a later window that day might be worse, but you can break too
             }
-        
+        }
+        // if global highest is already suspicious, no need to continue dates
+        if (finalresult == 2) break;
     }
+
     return finalresult;
 }
 
+
 int analyzelocation(const vector<Transaction>& tx) {
 
-    int finalResult = 0; // 0 = normal, 1 = alert, 2 = suspicious
+    int finalResult = 0;
 
-        vector<Transaction> dayTx;
-        for (auto &t : tx) {
-                dayTx.push_back(t);
-        }
+    // group by date
+    unordered_map<string, vector<Transaction>> perDate;
 
+    for (auto &t : tx)
+        perDate[t.date].push_back(t);
 
-        sort(dayTx.begin(), dayTx.end(), [](const Transaction &a, const Transaction &b) {
-            return a.time < b.time;
-        });
+    // check each date separately
+    for (auto &day : perDate) {
 
+        vector<Transaction> dayTx = day.second;
 
-        bool flagged = false;
-        bool alert = false;
+        sort(dayTx.begin(), dayTx.end(),
+             [](const Transaction &a, const Transaction &b) {
+                 return a.time < b.time;
+             });
 
         for (int i = 0; i < (int)dayTx.size() - 1; i++) {
+
             string loc1 = dayTx[i].location;
             string loc2 = dayTx[i + 1].location;
+
+            // SAME DAY ONLY
             int diff = timeDiffMinutes(dayTx[i].time, dayTx[i + 1].time);
 
+            // Different city + VERY fast change → SUSPICIOUS
             if (loc1 != loc2 && diff <= 15) {
-                // cout << "Suspicious Location Change Detected!\n";
-                // cout << "Transaction 1: " << loc1 << " at " << dayTx[i].time << "\n";
-                // cout << "Transaction 2: " << loc2 << " at " << dayTx[i + 1].time << "\n";
-                // cout << "Time Gap: " << diff << " minutes only!\n";
-                // cout << "Impossible travel detected — potential fraud.\n";
-                flagged = true;
                 finalResult = max(finalResult, 2);
-                break; 
             }
-            else if (loc1 != loc2 && diff > 15 && diff <= 30) {
-                // cout << "Alert: Quick Location Change\n";
-                // cout << "Transaction 1: " << loc1 << " at " << dayTx[i].time << "\n";
-                // cout << "Transaction 2: " << loc2 << " at " << dayTx[i + 1].time << "\n";
-                // cout << "Time Gap: " << diff << " minutes — possible fast travel or VPN use.\n";
-                alert = true;
+            // Different city + moderately fast → ALERT
+            else if (loc1 != loc2 && diff <= 30) {
                 finalResult = max(finalResult, 1);
             }
-        
-
-        // if (!flagged && !alert) {
-        //     cout << "Status: Normal → No unusual location jumps detected.\n";
-        //     cout << "Explanation: All transactions are from consistent or nearby regions.\n";
-        // }
+        }
     }
 
-    return finalResult; // 0-normal, 1-alert, 2-suspicious
+    return finalResult;
 }
 
 
@@ -439,6 +469,19 @@ void datewiseanalysis() {
     }
 }
 
+void writerisksummary(const string& acc_id, double riskscore, int final){
+    ofstream fout("riskscore.txt", ios::app);
+
+    fout << acc_id << "|"
+         << fixed << setprecision(2) << riskscore << "|"
+         << (final == 2 ? "Suspicious" :
+             final == 1 ? "Alert" : "Normal")
+         << "\n";
+
+    fout.close();
+
+}
+
 void accountwiseanalysis() {
     string acc_id;
     cout << "Enter the Account ID for analyze (ACCXXXX): ";
@@ -463,22 +506,23 @@ void accountwiseanalysis() {
     cout << "\n\n FRAUD DETECTION SUMMARY - ACCOUNT: " << acc_id << endl;
     cout << "----------------------------------------------------------\n";
 
+    // ---------------- FRAUD CHECKS --------------------
     double days_diff = computeDaysRange(tx);
     pair<int, int> period = analyseperiod(tx, days_diff);
-    int resultPeriod = period.first;
-    int highValueCount = period.second;
+    int resultPeriod = period.first;      
+    int highValueCount = period.second;  
 
-    int resulttime = analysetime(tx);
-    int resultloc = analyzelocation(tx);
+    int resultTime = analysetime(tx);    
+    int resultLoc  = analyzelocation(tx); 
 
-    int finalResult = max({resultPeriod, resulttime, resultloc});
+    int finalResult = max({resultPeriod, resultTime, resultLoc});
 
-    cout << "Total Transactions: " << tx.size() << endl;
-    cout << "High-Value Alerts: " << highValueCount << endl;
-    cout << "Analysis Period (days): " << (int)ceil(days_diff) << endl;
+    cout << "Total Transactions     : " << tx.size() << endl;
+    cout << "High-Value Alerts      : " << highValueCount << endl;
+    cout << "Analysis Period (days) : " << (int)ceil(days_diff) + 1 << endl;
     cout << "----------------------------------------------------------\n";
 
-    cout << "Account Status: ";
+    cout << "Account Status         : ";
     if (finalResult == 2)
         cout << "❌ Suspicious\n";
     else if (finalResult == 1)
@@ -488,6 +532,21 @@ void accountwiseanalysis() {
 
     cout << "----------------------------------------------------------\n";
 
+    // ---------------- RISK SCORE (0-10) --------------------
+    int cappedHigh = min(3, highValueCount); 
+    int current_sum = resultPeriod + resultTime + resultLoc + cappedHigh;
+
+    const int MAX_SUM = 9; 
+
+    double riskScore = (current_sum / (double)MAX_SUM) * 10.0;
+
+    cout << fixed << setprecision(2);
+    cout << "Computed Risk Score    : " << riskScore << " / 10\n";
+    cout << "Current Sum            : " << current_sum << endl;
+    cout << "Maximum Possible       : " << MAX_SUM << endl;
+    cout << "----------------------------------------------------------\n";
+
+    // ---------------- DETAILED REPORT --------------------
     char choice;
     cout << "Do you want to view detailed transaction report? (Y/N): ";
     cin >> choice;
@@ -497,7 +556,7 @@ void accountwiseanalysis() {
         cout << "----------------------------------------------------------\n";
         cout << left << setw(10) << "Txn ID"
              << " | " << setw(12) << "Date"
-             << " | " << setw(8) << "Time"
+             << " | " << setw(8)  << "Time"
              << " | " << setw(10) << "Amount"
              << " | " << setw(10) << "Location" << endl;
         cout << "----------------------------------------------------------\n";
@@ -505,7 +564,7 @@ void accountwiseanalysis() {
         for (auto &t : tx) {
             cout << left << setw(10) << t.trans_id
                  << " | " << setw(12) << t.date
-                 << " | " << setw(8) << t.time
+                 << " | " << setw(8)  << t.time
                  << " | " << setw(10) << t.amount
                  << " | " << setw(10) << t.location << endl;
         }
@@ -514,8 +573,47 @@ void accountwiseanalysis() {
         cout << "Detailed report skipped.\n";
     }
 
+    writerisksummary(acc_id,riskScore,finalResult);
+
     cout << "✅ Analysis complete for " << acc_id << ".\n";
 }
+
+void riskscores() {
+    ifstream file("riskscore.txt");
+
+    if (!file) {
+        cout << "No risk scores available.\n";
+        return;
+    }
+
+    cout << "\n📄 Risk Score Summary \n";
+    cout << "-------------------------------------------\n";
+    cout << left << setw(12) << "Account"
+         << setw(10) << "Score"
+         << "Status\n";
+    cout << "-------------------------------------------\n";
+
+    string line;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+
+        stringstream ss(line);
+        string acc, score, type;
+
+        getline(ss, acc, '|');
+        getline(ss, score, '|');
+        getline(ss, type); // last field
+
+        cout << left << setw(12) << acc
+             << setw(10) << score
+             << type << "\n";
+    }
+
+    cout << "-------------------------------------------\n";
+    file.close();
+}
+
+
 
 int main(){
     #ifdef _WIN32
@@ -532,16 +630,13 @@ int main(){
     // int choice;
 
 
-    cout<<"1. Load Transactions"<<endl;
-    // cout<<"2. Run Fraud Analysis"<<endl;
-    cout<<"3. Generate Daily Summary (Date-wise Report)"<<endl;
-    cout<<"4. Search by Account ID"<<endl;
-    cout<<"5. Search by Date"<<endl;
-    cout<<"6. View Top 3 High-Risk Accounts"<<endl;
-    cout<<"7. View Account Risk History"<<endl;
-    cout<<"8. Network / Relationship Analysis (Graph Mode)"<<endl;
-    cout<<"9. Export All Reports to File"<<endl;
-    cout<<"10. Exit"<<endl;
+    cout<<"1. Load Transactions"<<endl; // DONE
+    cout<<"2. Generate Daily Summary (Date-wise Report)"<<endl; // DONE
+    cout<<"3. Search by Account ID"<<endl;  // DONE
+    cout<<"4. View Top 3 High-Risk Accounts"<<endl;  // DONE
+    cout<<"5. View Account Risk History"<<endl;
+    cout<<"6. Network / Relationship Analysis (Graph Mode)"<<endl;
+    cout<<"7. Exit"<<endl;
 
     int choice; cin>>choice;
 
@@ -550,16 +645,19 @@ int main(){
     switch(choice){
         case 1:{
             loadalltransactions();
+            break;
+        }
+        case 2:{
+            datewiseanalysis();
+            break;
         }
         case 3:{
-            datewiseanalysis();
+            accountwiseanalysis();
+            break;
         }
         case 4:{
-            accountwiseanalysis();
-        }
-        case 5:{
-            
+            riskscores();
+            break;
         }
     }
-    
 }
