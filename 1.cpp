@@ -9,6 +9,8 @@
 #include<algorithm>
 #include<ctime>
 #include<iomanip>
+#include<queue>
+#include<unordered_set>
 #include<cmath>
 using namespace std;
 
@@ -221,59 +223,6 @@ pair<int,int> analyseperiod(const vector<Transaction>& tx, double days_diff) {
 }
 
 
-// int analysetime(const vector<Transaction>& tx) {
-
-//      int finalresult = 0; // 0: normal, 1: alert, 2: suspicious
-
-//         vector<Transaction> dayTx;
-//         for (auto &t : tx) {
-//                 dayTx.push_back(t);
-//         }
-
-
-//         sort(dayTx.begin(), dayTx.end(), [](const Transaction &a, const Transaction &b) {
-//             return a.time < b.time;
-//         });
-
-//         bool flagged = false;
-
-//         //cout << "\nAccount: " << acc << " | Date: " << target_date << "\n";
-
-//         for (int i = 0; i < (int)dayTx.size(); i++) {
-//             int count10 = 1;
-
-//             for (int j = i + 1; j < (int)dayTx.size(); j++) {
-//                 int diff = timeDiffMinutes(dayTx[i].time, dayTx[j].time);
-//                 if (diff <= 10)
-//                     count10++;
-//                 else
-//                     break;
-//             }
-
-//             // --- 10-min window analysis ---
-//             if (count10 > 5) {
-//                 // cout << "Suspicious Activity (10-min window): "
-//                 //      << count10 << " transactions within 10 minutes (starting at "
-//                 //      << dayTx[i].time << ")\n"
-//                 //      << " Reason: More than 5 rapid transactions is abnormal.\n"
-//                 //      << " -> Possible automation or system misuse.\n";
-//                 flagged = true;
-//                 finalresult = max(finalresult,2);
-//                 break;
-//             } 
-//             else if (count10 >= 2 && count10 <= 5) {
-//                 // cout << "Alert (10-min window): "
-//                 //      << count10 << " transactions within 10 minutes (starting at "
-//                 //      << dayTx[i].time << ")\n"
-//                 //      << "Explanation: Quick repeated transactions -- may indicate card testing or fraud probes.\n";
-//                 flagged = true;
-//                 finalresult = max(finalresult,1);
-//                 break;
-//             }
-        
-//     }
-//     return finalresult;
-// }
 
 int analysetime(const vector<Transaction>& tx) {
 
@@ -426,7 +375,6 @@ void datewiseanalysis() {
             normalcount++;
     }
 
-    // Compact Summary Block
     cout << left << setw(25) << "Total Transactions" << ": " << totaltxn << "\n\n";
     cout << left << setw(25) << "Suspicious Accounts" << ": " << suscount << "\n";
     cout << left << setw(25) << "Alert Accounts" << ": " << alertcount << "\n";
@@ -613,51 +561,224 @@ void riskscores() {
     file.close();
 }
 
+void viewAccountRiskHistory() {
+    string acc;
+    cout << "Enter Account ID to view risk history: ";
+    cin >> acc;
+    acc = trim(acc);
+
+    ifstream file("riskscore.txt");
+    if (!file) {
+        cout << "No risk scores available (riskscore.txt).\n";
+        return;
+    }
+    cout << "\nRisk history for " << acc << "\n";
+    cout << "────────────────────────────────\n";
+    string line;
+    bool found = false;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+        stringstream ss(line);
+        string a, score, status;
+        getline(ss, a, '|');
+        getline(ss, score, '|');
+        getline(ss, status);
+        if (trim(a) == acc) {
+            cout << "Score: " << trim(score) << " | " << trim(status) << "\n";
+            found = true;
+        }
+    }
+    if (!found) cout << "No entries found for this account.\n";
+    cout << "────────────────────────────────\n";
+    file.close();
+}
+
+void networkRelationshipAnalysis() {
+    cout << "\n\n🌐 NETWORK / RELATIONSHIP ANALYSIS (Graph Mode)\n";
+    cout << "────────────────────────────────────────────────────────\n";
+
+    if (accounts.empty()) {
+        cout << "⚠ No accounts loaded.\n";
+        return;
+    }
+
+    unordered_map<string, vector<string>> graph;
+    unordered_map<string, vector<string>> reasonMap;
+    unordered_set<string> addedEdges;
+
+    vector<Transaction> all;
+    for (auto &p : accounts)
+        for (auto &t : p.second)
+            all.push_back(t);
+
+    for (int i = 0; i < (int)all.size(); i++) {
+        for (int j = i + 1; j < (int)all.size(); j++) {
+
+            Transaction A = all[i];
+            Transaction B = all[j];
+
+            if (A.acc_id == B.acc_id) continue;
+
+            bool suspicious = false;
+            vector<string> reasons;
+
+            // Convert amounts
+            long long amtA = stoll(A.amount);
+            long long amtB = stoll(B.amount);
+
+            // TIME DIFFERENCE
+            int diff = 99999;
+            if (A.date == B.date)
+                diff = timeDiffMinutes(A.time, B.time);
+
+            // 1️⃣ HIGH VALUE (>= 2 lakh)
+            if (A.date == B.date && amtA >= 200000 && amtB >= 200000) {
+                suspicious = true;
+                reasons.push_back("High-value ≥ 2 lakh same day");
+            }
+
+            // 2️⃣ TIME SUSPICIOUS (<= 10 min)
+            if (A.date == B.date && diff <= 10) {
+                suspicious = true;
+                reasons.push_back("Time difference ≤ 10 min");
+            }
+
+            // 3️⃣ LOCATION SUSPICIOUS (DIFFERENT CITY + <= 15 min)
+            if (A.date == B.date && A.location != B.location && diff <= 15) {
+                suspicious = true;
+                reasons.push_back("Different cities ≤ 15 min");
+            }
+
+            if (suspicious) {
+                // Normalize key
+                string edgeKey = (A.acc_id < B.acc_id)
+                                 ? A.acc_id + "-" + B.acc_id
+                                 : B.acc_id + "-" + A.acc_id;
+
+                // Add edge only once
+                if (!addedEdges.count(edgeKey)) {
+                    graph[A.acc_id].push_back(B.acc_id);
+                    graph[B.acc_id].push_back(A.acc_id);
+                    addedEdges.insert(edgeKey);
+                }
+
+                // Add reasons (unique)
+                for (string &r : reasons) {
+                    auto &vec = reasonMap[edgeKey];
+                    if (find(vec.begin(), vec.end(), r) == vec.end())
+                        vec.push_back(r);
+                }
+            }
+        }
+    }
+
+    if (graph.empty()) {
+        cout << "No suspicious relationships detected.\n";
+        return;
+    }
+
+    cout << "\n📌 Suspicious Relationship Graph\n";
+    for (auto &g : graph) {
+        cout << g.first << " → ";
+        for (auto &nb : g.second) cout << nb << " ";
+        cout << "\n";
+    }
+
+    cout << "\n🔍 Reasons for each connection:\n";
+    for (auto &p : reasonMap) {
+        cout << p.first << " : ";
+        for (auto &r : p.second) cout << r << "; ";
+        cout << "\n";
+    }
+
+    cout << "\n🕸 SUSPICIOUS CLUSTERS IDENTIFIED\n";
+
+    unordered_map<string, bool> visited;
+
+    for (auto &node : graph) {
+        string start = node.first;
+
+        if (!visited[start]) {
+            vector<string> cluster;
+            queue<string> q;
+
+            q.push(start);
+            visited[start] = true;
+
+            while (!q.empty()) {
+                string curr = q.front(); q.pop();
+                cluster.push_back(curr);
+
+                for (auto &nbr : graph[curr]) {
+                    if (!visited[nbr]) {
+                        visited[nbr] = true;
+                        q.push(nbr);
+                    }
+                }
+            }
+
+            if (cluster.size() >= 2) {
+                cout << "🔴 Suspicious Cluster: ";
+                for (auto &acc : cluster) cout << acc << " ";
+                cout << "\n";
+            }
+        }
+    }
+
+    cout << "\nAnalysis Completed.\n";
+}
 
 
 int main(){
-    #ifdef _WIN32
+#ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
-    #endif
+#endif
+
     loadaccounts();
-    //displayaccounts();
-    //analysedates();
-    
-    //analysetime();
-    //analyzelocation();
-    // cout<<"Daily Summary Supports\n";
-    // int choice;
 
+    int choice;
 
-    cout<<"1. Load Transactions"<<endl; // DONE
-    cout<<"2. Generate Daily Summary (Date-wise Report)"<<endl; // DONE
-    cout<<"3. Search by Account ID"<<endl;  // DONE
-    cout<<"4. View Top 3 High-Risk Accounts"<<endl;  // DONE
-    cout<<"5. View Account Risk History"<<endl;
-    cout<<"6. Network / Relationship Analysis (Graph Mode)"<<endl;
-    cout<<"7. Exit"<<endl;
+    do {
+        cout << "\n\nMAIN MENU\n";
+        cout << "1. Load Transactions (summary)\n";
+        cout << "2. Generate Daily Summary (Date-wise Report)\n";
+        cout << "3. Search by Account ID (Account analysis)\n";
+        cout << "4. View Top 3 High-Risk Accounts\n";
+        cout << "5. View Account Risk History\n";
+        cout << "6. Network / Relationship Analysis (Graph Mode)\n";
+        cout << "7. Exit\n";
+        cout << "Choose: ";
 
-    int choice; cin>>choice;
+        cin >> choice;
 
-    
-    
-    switch(choice){
-        case 1:{
-            loadalltransactions();
-            break;
+        switch(choice){
+            case 1:
+                loadalltransactions();
+                break;
+            case 2:
+                datewiseanalysis();
+                break;
+            case 3:
+                accountwiseanalysis();
+                break;
+            case 4:
+                riskscores();
+                break;
+            case 5:
+                viewAccountRiskHistory();
+                break;
+             case 6:
+                networkRelationshipAnalysis();
+                break;
+            case 7:
+                cout << "Exiting...\n";
+                break;
+            default:
+                cout << "Invalid choice. Try again.\n";
         }
-        case 2:{
-            datewiseanalysis();
-            break;
-        }
-        case 3:{
-            accountwiseanalysis();
-            break;
-        }
-        case 4:{
-            riskscores();
-            break;
-        }
-    }
+
+    } while(choice != 7);
+
+    return 0;
 }

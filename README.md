@@ -32,5 +32,3 @@ c. Time wise breakup
     1. 5+ transactions in under 10 min, suspicious
     2. between 2 and 5, alert
     3. else normal
-
-d. 
