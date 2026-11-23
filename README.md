@@ -1,34 +1,17 @@
-# Fraud-Detection-in-Banking-Transactions
-This project aims to develop an intelligent fraud detection system that identifies suspicious or high-risk banking transactions by analyzing real-time transaction data.
+Fraud Detection in Banking Transactions
+A C++ console application that flags banking transactions for review based on transaction amounts, rapid activity, and quick changes between cities.
+Features
+- Load and summarize 180 sample transactions across six accounts.
+- View daily reports and classify accounts as Normal, Alert, or Suspicious.
+- Analyze individual accounts, calculate a risk score out of 10, and view saved risk history.
+- Explore relationships between accounts that share suspicious transaction patterns.
+Run locally
 
-Fields:
-Transaction ID, Account ID, Date, Time, Amount, Location
+From the repository folder, compile and run with transactions.txt in the same directory:
+g++ -std=c++17 1.cpp -o fraud_detection
+./fraud_detection
 
-It takes all the transaction data from transactions file(.txt) and sort them or you can say
-doing hashing of all account id's with their transactions and store them wisely.
 
-Ex. output: 
-Account ID: ACC1078
-Transactions:
-  Transaction ID: TXN005 | Date: 2025-08-13 | Time: 10:25 | Amount: 120000 | Location: Delhi
-  Transaction ID: TXN006 | Date: 2025-08-13 | Time: 10:45 | Amount: 99000 | Location: Delhi
-
-Fraud Checks:
-a. In this basically, we have found day wise transactions.
-    Normal : if amount < 50000, in one day
-    Suspicious : if amount > 200000 in one day
-    Alert: if amount > 50000 and amount < 200000 in one day
-
-b. Now, we are taking starting date and ending date to find the transactions done and then check the following suspicious things.
-    we have now, converted date to time for our ease to calculate the exact no. of days between two dates.
-    We have classified between three categories:
-    
-    i) if days <= 7, then normal:50000, Alert:50000-200000, suspicious in else
-    ii) if days>=7 and less than 30, normal: 1000000, alert: 1000000-2000000 and suspicious in else
-    iii) if days beyond 30, normal: 3000000, alert: 3000000-5000000 and suspicious in else
-
-c. Time wise breakup
-
-    1. 5+ transactions in under 10 min, suspicious
-    2. between 2 and 5, alert
-    3. else normal
+For a quick demo, choose option 2, enter 2026-12-01, and select Y for the detailed report.
+Agile Development Lab
+The project illustrates an iterative and incremental SDLC. Each increment supports a user story, starting with transaction import and daily reports, then adding account analysis, saved risk history, and relationship analysis. The lab report includes the proposed sprint plan, acceptance criteria, and test results.
